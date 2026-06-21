@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir hud-python fastmcp requests
+
+# the package is copied as /app/quant_firm so `import quant_firm.*` resolves
+COPY . /app/quant_firm/
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+# serve the env control channel (the standard HUD entrypoint)
+CMD ["hud", "serve", "/app/quant_firm/env_controllable.py", "--host", "0.0.0.0", "--port", "8765"]

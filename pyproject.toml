@@ -1,0 +1,14 @@
+[project]
+name = "quant-firm"
+version = "0.1.0"
+description = "Autonomous quant firm — HUD RL environment (gross margin from 10-Ks)"
+requires-python = ">=3.10"
+dependencies = [
+    "hud-python",
+    "fastmcp",
+    "requests",
+]
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["quant_firm*"]

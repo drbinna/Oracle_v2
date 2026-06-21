@@ -1,0 +1,77 @@
+"""
+The firm's specialists — exposed as MCP tools (HUD "subagents as tools" pattern).
+
+An orchestrator agent calls each of these as a single tool call. Two are
+deterministic (backed directly by the primary source, so they can't hallucinate);
+one is a real nested LLM rollout to show the full pattern.
+
+The auditor is the anti-reward-hacking seam: it independently re-verifies any
+numeric claim against EDGAR, so the orchestrator can't get paid for a made-up
+number that happens to slip past.
+
+Run the server (so the orchestrator's mcp capability has a live URL):
+    python -m quant_firm.subagents          # serves http://127.0.0.1:8080/mcp
+"""
+from __future__ import annotations
+from fastmcp import FastMCP
+
+from quant_firm.data import edgar, mdna
+
+tools = FastMCP(name="quant-specialists")
+
+
+@tools.tool
+def pull_financials(ticker: str, year: int) -> dict:
+    """Research analyst: pull verified revenue, cost of sales, and the 10-K
+    accession number for a fiscal year, straight from SEC EDGAR/XBRL."""
+    gt = edgar.gross_margin(ticker, year)
+    return {
+        "ticker": gt["ticker"],
+        "fiscal_year": year,
+        "revenue_usd": gt["revenue_usd"],
+        "cogs_usd": gt["cogs_usd"],
+        "accession": gt["accession"],
+        # note: gross margin intentionally NOT returned — the firm computes it.
+    }
+
+
+@tools.tool
+def read_mdna_drivers(ticker: str, year: int) -> dict:
+    """Research analyst: extract management's stated gross-margin drivers from
+    the 10-K MD&A (Item 7), with the supporting sentences."""
+    gt = edgar.gross_margin(ticker, year)
+    drivers, evidence = mdna.margin_drivers(gt["cik"], gt["accession"])
+    return {"drivers": drivers, "evidence": evidence[:2]}
+
+
+@tools.tool
+def audit_gross_margin(ticker: str, year: int, claimed_pct: float) -> dict:
+    """Risk auditor: independently verify a claimed gross-margin % against the
+    primary source. Returns the verdict and the true value. Use before reporting."""
+    gt = edgar.gross_margin(ticker, year)
+    truth = gt["gross_margin_pct"]
+    return {
+        "verified": abs(claimed_pct - truth) <= 0.10,
+        "claimed_pct": claimed_pct,
+        "truth_pct": truth,
+        "delta_pp": round(claimed_pct - truth, 4),
+        "accession": gt["accession"],
+    }
+
+
+# --- A true nested LLM rollout (deploy-time: needs the served orchestrator env) ---
+# from hud.agents import create_agent
+# from quant_firm.orchestrator import investigate   # an @env.template
+#
+# _specialist = create_agent("claude-haiku-4-5")     # one stateless instance
+#
+# async def deep_research(ticker: str, year: int) -> str:
+#     """Run a specialist sub-rollout and return its findings (single tool call
+#     to the orchestrator; a whole sub-rollout underneath)."""
+#     job = await investigate(ticker=ticker, year=year).run(_specialist)
+#     return job.runs[0].trace.content or ""
+# tools.tool(deep_research)
+
+
+if __name__ == "__main__":
+    tools.run(transport="http", host="127.0.0.1", port=8080)
