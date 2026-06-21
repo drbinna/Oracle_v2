@@ -10,10 +10,25 @@ before you run this for real, or SEC may rate-limit you.
 """
 from __future__ import annotations
 import functools
+import json
+import pathlib
 import requests
 
-HEADERS = {"User-Agent": "HUD Hackathon quant-firm (you@yourteam.com)"}
+HEADERS = {"User-Agent": "quant-firm HUD env (obinnaamadie@gmail.com)"}
 SEC = "https://data.sec.gov"
+
+# Hermetic gold cache: ground truth for the deployed taskset tickers is baked into
+# the image (data/gold_cache.json), so a cloud rollout needs no SEC egress. Tickers
+# not in the cache fall through to live EDGAR.
+_CACHE_PATH = pathlib.Path(__file__).with_name("gold_cache.json")
+
+
+@functools.lru_cache(maxsize=1)
+def _gold_cache() -> dict:
+    try:
+        return json.loads(_CACHE_PATH.read_text())
+    except Exception:
+        return {}
 
 
 @functools.lru_cache(maxsize=1)
@@ -90,6 +105,10 @@ def gross_margin(ticker: str, year: int) -> dict:
     Returns the numbers, the per-share-free margin %, and the citation accession.
     Raises if the company doesn't tag the needed concepts for that year.
     """
+    cached = _gold_cache().get(f"{ticker.upper()}:{year}")
+    if cached is not None:
+        return cached
+
     cik = ticker_to_cik(ticker)
     facts = company_facts(cik)
 

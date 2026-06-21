@@ -1,0 +1,77 @@
+{
+  "AAPL:2022": {
+    "ticker": "AAPL",
+    "cik": "0000320193",
+    "fiscal_year": 2022,
+    "revenue_usd": 394328000000,
+    "cogs_usd": 223546000000,
+    "gross_profit_usd": 170782000000,
+    "gross_margin_pct": 43.3096,
+    "accession": "0000320193-22-000108",
+    "period_end": "2022-09-24",
+    "source_tags": {
+      "revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "cogs": "CostOfGoodsAndServicesSold"
+    }
+  },
+  "MSFT:2022": {
+    "ticker": "MSFT",
+    "cik": "0000789019",
+    "fiscal_year": 2022,
+    "revenue_usd": 198270000000,
+    "cogs_usd": 62650000000,
+    "gross_profit_usd": 135620000000,
+    "gross_margin_pct": 68.4017,
+    "accession": "0001564590-22-026876",
+    "period_end": "2022-06-30",
+    "source_tags": {
+      "revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "cogs": "CostOfGoodsAndServicesSold"
+    }
+  },
+  "NVDA:2022": {
+    "ticker": "NVDA",
+    "cik": "0001045810",
+    "fiscal_year": 2022,
+    "revenue_usd": 26974000000,
+    "cogs_usd": 11618000000,
+    "gross_profit_usd": 15356000000,
+    "gross_margin_pct": 56.9289,
+    "accession": "0001045810-22-000036",
+    "period_end": "2023-01-29",
+    "source_tags": {
+      "revenue": "Revenues",
+      "cogs": "CostOfRevenue"
+    }
+  },
+  "KO:2022": {
+    "ticker": "KO",
+    "cik": "0000021344",
+    "fiscal_year": 2022,
+    "revenue_usd": 43004000000,
+    "cogs_usd": 18000000000,
+    "gross_profit_usd": 25004000000,
+    "gross_margin_pct": 58.1434,
+    "accession": "0000021344-23-000011",
+    "period_end": "2022-12-31",
+    "source_tags": {
+      "revenue": "Revenues",
+      "cogs": "CostOfGoodsAndServicesSold"
+    }
+  },
+  "HD:2022": {
+    "ticker": "HD",
+    "cik": "0000354950",
+    "fiscal_year": 2022,
+    "revenue_usd": 157403000000,
+    "cogs_usd": 104625000000,
+    "gross_profit_usd": 52778000000,
+    "gross_margin_pct": 33.5305,
+    "accession": "0000354950-22-000070",
+    "period_end": "2023-01-29",
+    "source_tags": {
+      "revenue": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "cogs": "CostOfRevenue"
+    }
+  }
+}
