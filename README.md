@@ -43,6 +43,21 @@ skill has nothing to climb. The reusable takeaway is the **controllable-variance
 `I(A;R|X)>0` *before* spending compute. A weaker base or a genuinely harder multi-step task is the
 path to a positive self-improvement curve.
 
+## Verifiable rewards (RLVR) & related work
+Rewards here are **verifiable**: every criterion is a programmatic check against SEC EDGAR/XBRL
+ground truth — **no LLM judge anywhere** (`rubric/graders.py`, `controllable.py`). That makes this
+a Reinforcement-Learning-with-Verifiable-Rewards (RLVR) environment by construction.
+
+Our flat-training finding connects directly to recent work on GRPO's **low-within-group-variance**
+failure: [RC-GRPO (arXiv:2602.03025)](https://arxiv.org/abs/2602.03025) diversifies rollouts with
+discrete reward-goal tokens to restore advantage signal, and [Gradient Starvation in Binary-Reward
+GRPO (arXiv:2605.07689)](https://arxiv.org/abs/2605.07689) analyzes how group-mean centering
+collapses. Our **trainability law** is the *precondition* those fixes assume: reward-token
+diversification (or any exploration trick) only helps when the variance is **policy-controllable**.
+On this env it isn't — exogenous retrieval luck on one axis, a saturated computation on the other —
+so no conditioning creates a climbable gradient. That's why our **controllable-variance gate runs
+before training**, not after.
+
 ## Quickstart
 ```bash
 export HUD_API_KEY=...                       # HUD gateway + training

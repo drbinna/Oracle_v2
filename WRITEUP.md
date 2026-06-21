@@ -122,6 +122,29 @@ fails ~30–70% of the time) or a weaker base model — both scope decisions, no
 *(Caveat: this controllable sweep is 3 tickers × d1, n=24/design — enough to show saturation, not a
 full benchmark; the 5-ticker × d1/d2 sweep is one command away.)*
 
+## Verifiable rewards (RLVR) and related work
+Every reward in this environment is **verifiable** — a programmatic check against SEC EDGAR/XBRL,
+no LLM judge (`rubric/graders.py`, `controllable.py`). This is an RLVR setup, which is what makes
+the trainability question well-posed: the reward is an objective function of the agent's output and
+the primary source, not a model's opinion.
+
+Our central finding sits directly alongside recent analyses of GRPO's **low-within-group-variance**
+failure mode:
+- **RC-GRPO** (arXiv:2602.03025) — when rollouts in a group collapse to all-0/all-1, the
+  group-normalized advantage vanishes; it injects discrete reward-goal tokens so the policy emits
+  varied-quality trajectories and the group regains spread.
+- **Gradient Starvation in Binary-Reward GRPO** (arXiv:2605.07689) — analyzes why group-mean
+  centering fails under degenerate binary rewards.
+
+Both propose fixes for *low within-group variance*. Our **trainability law** supplies the
+precondition they implicitly assume: those fixes only help when the missing variance is
+**policy-controllable** (`I(A_policy;R | X_exogenous) > 0`). When the variance is exogenous
+(retrieval luck) or the controllable skill is saturated, reward-token diversification cannot
+manufacture a climbable gradient — there is nothing for the policy to steer toward. The
+controllable-variance gate is therefore an *upstream* check: run it before reaching for RC-GRPO-style
+exploration tricks, so you don't spend compute conditioning a reward whose variance the policy can't
+move.
+
 ## Reproduction
 ```bash
 # variance gate (no GPU)
