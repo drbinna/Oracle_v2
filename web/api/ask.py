@@ -90,7 +90,7 @@ def _post(model, messages):
 def ask_llm(question, history=None):
     if not LLM_API_KEY:
         return ("The backend is deployed but no model key is set. "
-                "Set LLM_API_KEY in the server environment to enable live answers.")
+                "Set LLM_API_KEY in the server environment to enable live answers.", None)
     messages = [{"role": "system", "content": SYSTEM}]
     if isinstance(history, list):
         messages += history[-6:]
@@ -100,7 +100,7 @@ def ask_llm(question, history=None):
     last_detail = ""
     for model in candidates:
         try:
-            return _post(model, messages)
+            return _post(model, messages), model
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", "ignore")
             last_detail = body[:300]
@@ -142,7 +142,7 @@ class handler(BaseHTTPRequestHandler):
             if not question:
                 self._json(400, {"error": "missing 'question'"})
                 return
-            answer = ask_llm(question, body.get("history"))
-            self._json(200, {"answer": answer})
+            answer, used = ask_llm(question, body.get("history"))
+            self._json(200, {"answer": answer, "model": used})
         except Exception as e:
             self._json(502, {"error": str(e)})
