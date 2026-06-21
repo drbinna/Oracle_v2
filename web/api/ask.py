@@ -77,7 +77,8 @@ def _post(model, messages):
         LLM_BASE_URL.rstrip("/") + "/chat/completions",
         data=payload,
         headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + LLM_API_KEY},
+                 "Authorization": "Bearer " + LLM_API_KEY,
+                 "x-api-key": LLM_API_KEY},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=55) as resp:
