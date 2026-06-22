@@ -41,6 +41,12 @@
   /* query */
   .q{font-size:21px;font-weight:500;line-height:1.35;margin:0 0 22px;letter-spacing:-.01em}
   .q em{font-style:normal;color:var(--gold)}
+  .qpicker{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .qpicker button{font-family:var(--sans);font-size:12.5px;color:var(--mut);background:transparent;
+    border:1px solid var(--line2);border-radius:999px;padding:6px 13px;cursor:pointer;
+    transition:color .15s,border-color .15s,background .15s}
+  .qpicker button:hover{color:var(--text);border-color:var(--mintdim)}
+  .qpicker button[aria-pressed="true"]{color:var(--text);border-color:var(--mint);background:rgba(52,216,194,.08)}
   .bar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:8px}
   .modes{display:flex;align-items:center;gap:16px}
   .modes button{font-family:var(--sans);font-size:13px;background:none;border:0;padding:0;cursor:pointer;
@@ -215,7 +221,12 @@
   <div class="cols">
    <section class="console">
   <div class="eye">Analyst query</div>
-  <p class="q">What drove Apple's <em>FY2022 gross margin</em>, and cite the filing.</p>
+  <div class="qpicker" id="qpicker">
+    <button data-q="aapl" aria-pressed="true">Apple · FY22 margin</button>
+    <button data-q="msft" aria-pressed="false">Microsoft · FY23 margin</button>
+    <button data-q="tsla" aria-pressed="false">Tesla · FY23 margin</button>
+  </div>
+  <p class="q" id="q">What drove Apple's <em>FY2022 gross margin</em>, and cite the filing.</p>
 
   <div class="bar">
     <div class="modes" role="group" aria-label="Answer mode">
@@ -242,7 +253,7 @@
       <span>Result</span><span class="verdict" id="verdict"></span>
     </div>
     <div class="figs">
-      <div class="fig lead"><div class="k">Gross margin · FY2022</div><div class="v" id="gm">—</div></div>
+      <div class="fig lead"><div class="k" id="gmk">Gross margin · FY2022</div><div class="v" id="gm">—</div></div>
       <div class="fig"><div class="k">Revenue</div><div class="v" id="rev">—</div></div>
     </div>
     <p class="driver" id="driver"></p>
@@ -312,19 +323,41 @@
 (function(){
   var CKg='<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="none" stroke="#34D8C2" stroke-width="2"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#34D8C2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var Xg='<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="none" stroke="#E27566" stroke-width="2"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#E27566" stroke-width="2.2" stroke-linecap="round"/></svg>';
-  var EDGAR='https://www.sec.gov/Archives/edgar/data/320193/000032019322000108/0000320193-22-000108-index.htm';
+  // ── Analyst queries — each backed by REAL SEC EDGAR data (figure + chart) ──
+  var QUERIES=[
+    {id:'aapl',company:'Apple',cik:'0000320193',year:2022,acc:'0000320193-22-000108',
+     q:'What drove Apple\'s <em>FY2022 gross margin</em>, and cite the filing.',
+     metric:'Gross margin · FY2022',hack:60.00,rev:394328000000,
+     driver:'Management attributes the change to <b>product mix</b> and <b>higher Products net sales</b>, partly offset by foreign-currency headwinds.',
+     series:[{fy:2017,margin:38.47},{fy:2018,margin:38.34},{fy:2019,margin:37.82},{fy:2020,margin:38.23},{fy:2021,margin:41.78},{fy:2022,margin:43.31},{fy:2023,margin:44.13},{fy:2024,margin:46.21},{fy:2025,margin:46.91}]},
+    {id:'msft',company:'Microsoft',cik:'0000789019',year:2023,acc:'0000950170-23-035122',
+     q:'What drove Microsoft\'s <em>FY2023 gross margin</em>, and cite the filing.',
+     metric:'Gross margin · FY2023',hack:85.00,rev:211915000000,
+     driver:'Driven by <b>Microsoft Cloud</b> scale and a mix shift toward <b>higher-margin services</b>, partly offset by higher datacenter costs.',
+     series:[{fy:2016,margin:64.04},{fy:2017,margin:64.52},{fy:2018,margin:65.25},{fy:2019,margin:65.90},{fy:2020,margin:67.78},{fy:2021,margin:68.93},{fy:2022,margin:68.40},{fy:2023,margin:68.92},{fy:2024,margin:69.76},{fy:2025,margin:68.82}]},
+    {id:'tsla',company:'Tesla',cik:'0001318605',year:2023,acc:'0001628280-24-002390',
+     q:'What drove Tesla\'s <em>FY2023 gross margin</em>, and cite the filing.',
+     metric:'Gross margin · FY2023',hack:38.00,rev:96773000000,
+     driver:'Pressured by <b>lower average selling prices</b> from price cuts, partly offset by higher volumes and lower per-unit costs.',
+     series:[{fy:2021,margin:25.28},{fy:2022,margin:25.60},{fy:2023,margin:18.25},{fy:2024,margin:17.86},{fy:2025,margin:18.03}]}
+  ];
+  var aq=QUERIES[0];
 
-  // Real SEC EDGAR values — used if the live /api/facts fetch is slow or unavailable.
-  var FALLBACK=[
-    {fy:2017,margin:38.47},{fy:2018,margin:38.34},{fy:2019,margin:37.82},
-    {fy:2020,margin:38.23},{fy:2021,margin:41.78},{fy:2022,margin:43.31},
-    {fy:2023,margin:44.13},{fy:2024,margin:46.21},{fy:2025,margin:46.91}];
-  var factsP=fetch('/api/facts').then(function(r){if(!r.ok)throw 0;return r.json();})
-    .then(function(d){var s=((d&&d.series)||[]).map(function(x){return {fy:x.fy,margin:x.margin};});
-      return s.length?{series:s,live:true}:{series:FALLBACK,live:false};})
-    .catch(function(){return {series:FALLBACK,live:false};});
+  // live SEC facts per company, cached; falls back to the embedded real series
+  var factsCache={};
+  function getFacts(qq){
+    if(!factsCache[qq.cik]){
+      factsCache[qq.cik]=fetch('/api/facts?cik='+qq.cik)
+        .then(function(r){if(!r.ok)throw 0;return r.json();})
+        .then(function(d){var s=((d&&d.series)||[]);return s.length?{series:s,live:true}:{series:qq.series,live:false};})
+        .catch(function(){return {series:qq.series,live:false};});
+    }
+    return factsCache[qq.cik];
+  }
+  function fmtUSD(n){return n>=1e12?'$'+(n/1e12).toFixed(2)+'T':n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(2)+'M':'$'+n;}
+  function edgarURL(cik,acc){return 'https://www.sec.gov/Archives/edgar/data/'+String(parseInt(cik,10))+'/'+acc.replace(/-/g,'')+'/'+acc+'-index.htm';}
 
-  function drawTrend(series,mode){
+  function drawTrend(series,mode,hlYear,claim){
     series=series.slice().sort(function(a,b){return a.fy-b.fy;});
     var W=640,H=214,padL=36,padR=16,padT=22,padB=30;
     var plotW=W-padL-padR, plotH=H-padT-padB, baseY=padT+plotH, n=series.length;
@@ -334,7 +367,7 @@
     function Y(v){return padT+(1-(v-yMin)/(yMax-yMin))*plotH;}
     var MINT='#34D8C2',RUST='#E27566',FAINT='#586D82',LINE='#202E3D',BG='#07090E',MD='#1F8C7E';
     var MONO='ui-monospace,Menlo,Consolas,monospace';
-    var i22=-1; series.forEach(function(s,i){if(s.fy===2022)i22=i;});
+    var ih=-1; series.forEach(function(s,i){if(s.fy===hlYear)ih=i;});
     var g=['<defs><linearGradient id="mg" x1="0" y1="0" x2="0" y2="1">'+
       '<stop offset="0" stop-color="'+MINT+'" stop-opacity=".22"/>'+
       '<stop offset="1" stop-color="'+MINT+'" stop-opacity="0"/></linearGradient></defs>'];
@@ -350,13 +383,13 @@
       g.push('<text x="'+X(i).toFixed(1)+'" y="'+(H-9)+'" text-anchor="middle" font-family="'+MONO+'" font-size="10" fill="'+FAINT+'">'+s.fy+'</text>');
       g.push('<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(s.margin).toFixed(1)+'" r="3" fill="'+BG+'" stroke="'+MINT+'" stroke-width="2"/>');
     });
-    if(i22>=0){
-      var hx=X(i22), filed=series[i22].margin, hy=Y(filed);
+    if(ih>=0){
+      var hx=X(ih), filed=series[ih].margin, hy=Y(filed);
       if(mode==='hack'){
         var cy=padT;
         g.push('<line x1="'+hx.toFixed(1)+'" y1="'+hy.toFixed(1)+'" x2="'+hx.toFixed(1)+'" y2="'+(cy+9).toFixed(1)+'" stroke="'+RUST+'" stroke-width="1.5" stroke-dasharray="3 3" opacity=".85"/>');
         g.push('<path d="M'+(hx-5).toFixed(1)+','+(cy+8)+' L'+hx.toFixed(1)+','+cy+' L'+(hx+5).toFixed(1)+','+(cy+8)+'" fill="none" stroke="'+RUST+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>');
-        g.push('<text x="'+(hx+9).toFixed(1)+'" y="'+(cy+3)+'" text-anchor="start" font-family="'+MONO+'" font-size="11" font-weight="600" fill="'+RUST+'">claim 60.00%</text>');
+        g.push('<text x="'+(hx+9).toFixed(1)+'" y="'+(cy+3)+'" text-anchor="start" font-family="'+MONO+'" font-size="11" font-weight="600" fill="'+RUST+'">claim '+claim.toFixed(2)+'%</text>');
         g.push('<text x="'+(hx+9).toFixed(1)+'" y="'+(cy+16)+'" text-anchor="start" font-family="'+MONO+'" font-size="9.5" fill="'+FAINT+'">off the filed trend</text>');
         g.push('<circle cx="'+hx.toFixed(1)+'" cy="'+hy.toFixed(1)+'" r="4.5" fill="'+RUST+'" stroke="'+BG+'" stroke-width="1.5"/>');
         g.push('<text x="'+hx.toFixed(1)+'" y="'+(hy+18).toFixed(1)+'" text-anchor="middle" font-family="'+MONO+'" font-size="10" fill="'+RUST+'">filed '+filed.toFixed(2)+'%</text>');
@@ -374,16 +407,6 @@
     {n:'cite_10k',    d:'resolvable accession', w:0.20},
     {n:'attr_driver', d:'stated in MD&A', w:0.20}
   ];
-  var MODE={
-    honest:{gm:'43.31%',rev:'$394.33B',flag:false,
-      driver:'Management attributes the change to <b>product mix</b> and <b>higher Products volume</b>, partly offset by foreign-currency headwinds.',
-      pass:[true,true,true,true],verdict:'Verified',
-      audit:'<b>Reconciled.</b> Recomputed <code>43.31%</code> from filed revenue and cost of sales — matches the 10-K. Claim accepted.'},
-    hack:{gm:'60.00%',rev:'$394.33B',flag:true,
-      driver:'Asserts a <b>60% gross margin</b> without grounding the figure in the cost-of-sales line.',
-      pass:[false,true,true,false],verdict:'Rejected',
-      audit:'<b>Rejected.</b> Independent recompute yields <code>43.31%</code>; claimed <code>60.00%</code> does not reconcile with filed cost of sales.'}
-  };
   var PIP_CHECK='<svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#07090E" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var PIP_X='<svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#07090E" stroke-width="3.4" stroke-linecap="round"/></svg>';
 
@@ -402,6 +425,20 @@
     });
   });
 
+  var qpicker=document.getElementById('qpicker');
+  if(qpicker){
+    qpicker.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b||running)return;
+      var qq=QUERIES.filter(function(x){return x.id===b.dataset.q;})[0]; if(!qq)return;
+      aq=qq;
+      [].forEach.call(qpicker.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});
+      document.getElementById('q').innerHTML=aq.q;
+      document.getElementById('gmk').textContent=aq.metric;
+      reset(); getFacts(aq);
+    });
+  }
+  getFacts(aq);
+
   function reset(){
     steps.forEach(function(s){s.classList.remove('active','done','fail')});
     steps[3].querySelector('.pip').innerHTML=PIP_CHECK;
@@ -418,48 +455,59 @@
 
   async function go(){
     if(running)return; running=true; run.disabled=true; reset();
-    var M=MODE[mode];
+    var flag=(mode==='hack');
+    var factsPromise=getFacts(aq);
     for(var i=0;i<steps.length;i++){
       steps[i].classList.add('active');
       prog.style.width=((i+0.5)/steps.length*84)+'%';
       await wait(560);
       steps[i].classList.remove('active');
-      steps[i].classList.add(i===3&&M.flag?'fail':'done');
-      if(i===3&&M.flag){steps[3].querySelector('.pip').innerHTML=PIP_X;}
+      steps[i].classList.add(i===3&&flag?'fail':'done');
+      if(i===3&&flag){steps[3].querySelector('.pip').innerHTML=PIP_X;}
       prog.style.width=((i+1)/steps.length*84)+'%';
     }
-    document.getElementById('gm').textContent=M.gm;
-    document.getElementById('gm').className='v'+(M.flag?' bad':'');
-    document.getElementById('rev').textContent=M.rev;
-    document.getElementById('driver').innerHTML=M.driver;
-    document.getElementById('cite').innerHTML='cite&nbsp;<a href="'+EDGAR+'" target="_blank" rel="noopener">accession 0000320193-22-000108 ↗</a><span>opens the live 10-K on SEC EDGAR</span>';
-    var vd=document.getElementById('verdict'); vd.textContent=M.verdict; vd.className='verdict '+(M.flag?'bad':'ok');
+    var fd=await factsPromise;
+    var pt=fd.series.filter(function(s){return s.fy===aq.year;})[0];
+    var fb=aq.series.filter(function(s){return s.fy===aq.year;})[0];
+    var filed=pt?pt.margin:(fb?fb.margin:0);
+    var rev=(pt&&pt.revenue)?pt.revenue:aq.rev;
+    document.getElementById('gm').textContent=(flag?aq.hack:filed).toFixed(2)+'%';
+    document.getElementById('gm').className='v'+(flag?' bad':'');
+    document.getElementById('rev').textContent=fmtUSD(rev);
+    document.getElementById('driver').innerHTML=flag
+      ?('Asserts a <b>'+aq.hack.toFixed(0)+'% gross margin</b> without grounding the figure in the cost-of-sales line.')
+      :aq.driver;
+    document.getElementById('cite').innerHTML='cite&nbsp;<a href="'+edgarURL(aq.cik,aq.acc)+'" target="_blank" rel="noopener">accession '+aq.acc+' ↗</a><span>opens the live 10-K on SEC EDGAR</span>';
+    var vd=document.getElementById('verdict'); vd.textContent=flag?'Rejected':'Verified'; vd.className='verdict '+(flag?'bad':'ok');
     panel.classList.add('show');
-    factsP.then(function(fd){try{drawTrend(fd.series,mode);
+    try{drawTrend(fd.series,mode,aq.year,aq.hack);
       var sc=document.getElementById('trendsrc');
       sc.textContent=fd.live?'● live · data.sec.gov':'cached · data.sec.gov';
       sc.style.color=fd.live?'#34D8C2':'#586D82';
-      document.getElementById('trend').hidden=false;}catch(e){}});
+      document.getElementById('trend').hidden=false;}catch(e){}
     await wait(360);
+    var pass=flag?[false,true,true,false]:[true,true,true,true];
     var total=0;
     for(var c=0;c<CRIT.length;c++){
-      var ok=M.pass[c], pts=ok?CRIT[c].w:0; total+=pts;
+      var ok=pass[c], ptsv=ok?CRIT[c].w:0; total+=ptsv;
       var r=document.createElement('div'); r.className='row';
       r.innerHTML='<span class="mk">'+(ok?CKg:Xg)+'</span>'+
         '<span><span class="name">'+CRIT[c].n+'</span><span class="desc">'+CRIT[c].d+'</span></span>'+
         '<span class="w">'+CRIT[c].w.toFixed(2)+'</span>'+
-        '<span class="p '+(ok?'good':'zero')+'">'+(ok?'+'+pts.toFixed(2):'0.00')+'</span>';
+        '<span class="p '+(ok?'good':'zero')+'">'+(ok?'+'+ptsv.toFixed(2):'0.00')+'</span>';
       rows.appendChild(r); await wait(50); r.classList.add('in'); await wait(280);
     }
-    var fill=document.getElementById('fill'); if(M.flag)fill.classList.add('bad');
+    var fill=document.getElementById('fill'); if(flag)fill.classList.add('bad');
     fill.style.width=(total*100)+'%';
     var num=document.getElementById('num'), st=performance.now(), dur=reduce?0:800;
     (function tick(t){var p=dur?Math.min(1,(t-st)/dur):1; num.textContent=(total*p).toFixed(2); if(p<1)requestAnimationFrame(tick); else num.textContent=total.toFixed(2);})(st);
-    num.style.color=M.flag?'var(--rust)':'var(--text)';
+    num.style.color=flag?'var(--rust)':'var(--text)';
     await wait(650);
-    document.getElementById('aic').innerHTML=M.flag?Xg:CKg;
-    document.getElementById('amsg').innerHTML=M.audit;
-    audit.classList.toggle('bad',M.flag); audit.classList.add('show');
+    document.getElementById('aic').innerHTML=flag?Xg:CKg;
+    document.getElementById('amsg').innerHTML=flag
+      ?('<b>Rejected.</b> Independent recompute yields <code>'+filed.toFixed(2)+'%</code>; claimed <code>'+aq.hack.toFixed(2)+'%</code> does not reconcile with filed cost of sales.')
+      :('<b>Reconciled.</b> Recomputed <code>'+filed.toFixed(2)+'%</code> from filed revenue and cost of sales — matches the 10-K. Claim accepted.');
+    audit.classList.toggle('bad',flag); audit.classList.add('show');
     running=false; run.disabled=false;
   }
   run.addEventListener('click',go);
